@@ -1,6 +1,8 @@
+// https://git.quacker.org/d/freebsd-nq/commit/9c5cbc30e7062561affda0e5413f6db27a83b27e#diff-59f10e04966536300a4a3ab9c1a13c389327d620
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <errno.h>
 
 static bool	ft_isupper(int c)
 {
@@ -50,6 +52,24 @@ static int	is_negative(const char **s)
 	return (0);
 }
 
+static int	parse_base(const char **s, int base)
+{
+	if ((base == 0 || base == 16) && **s == '0'
+		&& ((*s)[1] == 'x' || (*s)[1] == 'X'))
+	{
+		(*s) += 2;
+		base = 16;
+	}
+	if (base == 0)
+	{
+		if (**s == '0')
+			base = 8;
+		else
+			base = 10;
+	}
+	return (base);
+}
+
 intmax_t	ft_strtoimax(const char *nptr, char **endptr, int base)
 {
 	const char		*s;
@@ -62,19 +82,11 @@ intmax_t	ft_strtoimax(const char *nptr, char **endptr, int base)
 
 	s = skip_whitespace(nptr);
 	neg = is_negative(&s);
-	if ((base == 0 || base == 16) &&
-					*s == '0' && *(s + 1) == 'x' ||
-			*(s + 1) == 'X')
-	{
-		s += 2;
-		base = 16;
-	}
-	if (base == 0)
-		base = *s == '0' ? 8 : 10;
+	base = parse_base(&s, base);
 	acc = 0;
 	any = 0;
 	if (base < 2 || base > 36)
-		return (0);
+		errno = EINVAL;
 	cutoff = neg ? (uintmax_t) - (INTMAX_MIN + INTMAX_MAX) + INTMAX_MAX : INTMAX_MAX;
 	cutlim = cutoff % base;
 	cutoff /= base;
@@ -104,7 +116,12 @@ intmax_t	ft_strtoimax(const char *nptr, char **endptr, int base)
 		s++;
 	}
 	if (any < 0)
+	{
 		acc = neg ? INTMAX_MIN : INTMAX_MAX;
+		errno = ERANGE;
+	}
+	else if (!any)
+		errno = EINVAL;
 	else if (neg)
 		acc = -acc;
 	if (endptr != NULL)
@@ -128,9 +145,9 @@ int main()
 	printf("end: %s\n", end);
 	printf("\n============\n\n");
 	s = "0x236f9   ";
-	printf("%jd\n", ft_strtoimax(s, &end, 16));
+	printf("%jd\n", ft_strtoimax(s, &end, 15));
 	printf("end: %s\n", end);
-	printf("%jd\n", strtoimax(s, &end, 16));
+	printf("%jd\n", strtoimax(s, &end, 15));
 	printf("end: %s\n", end);
 	printf("\n============\n\n");
 	printf("%jd\n", ft_strtoimax(s, &end, 0));
@@ -157,8 +174,8 @@ int main()
 	printf("end: %s\n", end);
 	printf("\n============\n\n");
 	s = "		-9223372036854775809   ";
-	printf("%jd\n", ft_strtoimax(s, &end, 0));
+	printf("%jd\n", ft_strtoimax(s, &end, 15));
 	printf("end: %s\n", end);
-	printf("%jd\n", strtoimax(s, &end, 0));
+	printf("%jd\n", strtoimax(s, &end, 15));
 	printf("end: %s\n", end);
 }
